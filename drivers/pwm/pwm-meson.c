@@ -99,6 +99,7 @@ struct meson_pwm_channel {
 struct meson_pwm_data {
 	const char * const *parent_names;
 	unsigned int num_parents;
+	unsigned int extern_clk;
 };
 
 struct meson_pwm {
@@ -395,6 +396,10 @@ static const struct meson_pwm_data pwm_g12a_ao_cd_data = {
 	.num_parents = ARRAY_SIZE(pwm_g12a_ao_cd_parent_names),
 };
 
+static const struct meson_pwm_data pwm_s4_data = {
+	.extern_clk = true,
+};
+
 static const struct of_device_id meson_pwm_matches[] = {
 	{
 		.compatible = "amlogic,meson8b-pwm",
@@ -428,6 +433,10 @@ static const struct of_device_id meson_pwm_matches[] = {
 		.compatible = "amlogic,meson-g12a-ao-pwm-cd",
 		.data = &pwm_g12a_ao_cd_data
 	},
+	{
+		.compatible = "amlogic,s4-pwm",
+		.data = &pwm_s4_data,
+	},
 	{},
 };
 MODULE_DEVICE_TABLE(of, meson_pwm_matches);
@@ -449,6 +458,16 @@ static int meson_pwm_init_channels(struct meson_pwm *meson)
 		struct meson_pwm_channel *channel = &meson->channels[i];
 		struct clk_parent_data div_parent = {}, gate_parent = {};
 		struct clk_init_data init = {};
+
+		if (meson->data->extern_clk) {
+			snprintf(name, sizeof(name), "clkin%u", i);
+			channel->clk = devm_clk_get(dev, name);
+			if (IS_ERR(channel->clk)) {
+				dev_err(meson->chip.dev, "can't get device clock\n");
+				return PTR_ERR(channel->clk);
+			}
+			continue;
+		}
 
 		snprintf(name, sizeof(name), "%s#mux%u", dev_name(dev), i);
 

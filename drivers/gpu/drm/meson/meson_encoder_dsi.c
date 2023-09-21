@@ -113,7 +113,7 @@ int meson_encoder_dsi_probe(struct meson_drm *priv)
 	/* DSI Transceiver Bridge */
 	remote = of_graph_get_remote_node(priv->dev->of_node, 2, 0);
 	if (!remote) {
-		dev_err(priv->dev, "DSI transceiver device is disabled");
+		dev_dbg(priv->dev, "DSI transceiver device is disabled");
 		return 0;
 	}
 

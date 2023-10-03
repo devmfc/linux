@@ -20,6 +20,7 @@ properties:
   compatible:
     oneOf:
       - const: amlogic,meson-axg-mmc
+      - const: amlogic,meson-s4-mmc
       - items:
           - const: amlogic,meson-gx-mmc
           - const: amlogic,meson-gxbb-mmc

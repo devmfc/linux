@@ -13,6 +13,13 @@
 #include <dt-bindings/reset/amlogic,meson-s4-reset.h>
 
 / {
+	
+	aliases {
+        mmc0 = &sd_emmc_b; /* SD card */
+        mmc1 = &sd_emmc_c; /* eMMC */
+        mmc2 = &sd_emmc_a; /* SDIO */
+    };
+	
 	cpus {
 		#address-cells = <2>;
 		#size-cells = <0>;
@@ -533,6 +540,42 @@
 				#size-cells = <0>;
 				compatible = "snps,dwmac-mdio";
 			};
+		};
+		
+		sd_emmc_a: mmc@fe088000 {
+			compatible = "amlogic,meson-s4-mmc";
+			reg = <0x0 0xfe088000 0x0 0x800>;
+			interrupts = <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&clkc_periphs CLKID_SDEMMC_A>,
+				 <&clkc_periphs CLKID_SD_EMMC_A>,
+				 <&clkc_periphs CLKID_FCLK_DIV2>;
+			clock-names = "core", "clkin0", "clkin1";
+			resets = <&reset RESET_SD_EMMC_A>;
+			status = "disabled";
+		};
+
+		sd_emmc_b: mmc@fe08a000 {
+			compatible = "amlogic,meson-s4-mmc";
+			reg = <0x00 0xfe08a000 0x00 0x800>;
+			interrupts = <GIC_SPI 177 IRQ_TYPE_EDGE_RISING>;
+			clocks = <&clkc_periphs CLKID_SDEMMC_B>,
+				 <&clkc_periphs CLKID_SD_EMMC_B>,
+				 <&clkc_periphs CLKID_FCLK_DIV2>;
+			clock-names = "core", "clkin0", "clkin1";
+			resets = <&reset RESET_SD_EMMC_B>;
+			status = "disabled";
+		};
+
+		sd_emmc_c: mmc@fe08c000 {
+			compatible = "amlogic,meson-s4-mmc";
+			reg = <0x0 0xfe08c000 0x0 0x800>;
+			interrupts = <GIC_SPI 178 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&clkc_periphs CLKID_NAND>,
+				 <&clkc_periphs CLKID_SD_EMMC_C>,
+				 <&clkc_periphs CLKID_HIFI_PLL>;
+			clock-names = "core", "clkin0", "clkin1";
+			resets = <&reset RESET_NAND_EMMC>;
+			status = "disabled";
 		};
 		
 		usb: usb@fe03a000 {

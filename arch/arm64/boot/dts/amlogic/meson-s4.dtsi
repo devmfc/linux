@@ -166,6 +166,12 @@
 				};
 			};
 
+			watchdog@2100 {
+                               	compatible = "amlogic,s4-wdt", "amlogic,t7-wdt";
+                               	reg = <0x0 0x2100 0x0 0x10>;
+                        	clocks = <&xtal>;
+                       	}; 
+
 			periphs_pinctrl: pinctrl@4000 {
 				compatible = "amlogic,meson-s4-periphs-pinctrl";
 				#address-cells = <2>;

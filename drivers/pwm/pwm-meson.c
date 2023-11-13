@@ -44,6 +44,8 @@
 
 #define REG_PWM_A		0x0
 #define REG_PWM_B		0x4
+#define REG_PWM_A2		0x14
+#define REG_PWM_B2		0x18
 #define PWM_LOW_MASK		GENMASK(15, 0)
 #define PWM_HIGH_MASK		GENMASK(31, 16)
 
@@ -58,8 +60,11 @@
 #define MISC_CLK_SEL_MASK	0x3
 #define MISC_B_EN		BIT(1)
 #define MISC_A_EN		BIT(0)
+#define MISC_A2_EN		BIT(25)
+#define MISC_B2_EN		BIT(24)
 
-#define MESON_NUM_PWMS		2
+//#define MESON_NUM_PWMS		2
+#define MESON_NUM_PWMS_MAX		4
 #define MESON_MAX_MUX_PARENTS	4
 
 static struct meson_pwm_channel_data {
@@ -68,7 +73,7 @@ static struct meson_pwm_channel_data {
 	u8		clk_div_shift;
 	u8		clk_en_shift;
 	u32		pwm_en_mask;
-} meson_pwm_per_channel_data[MESON_NUM_PWMS] = {
+} meson_pwm_per_channel_data[MESON_NUM_PWMS_MAX] = {
 	{
 		.reg_offset	= REG_PWM_A,
 		.clk_sel_shift	= MISC_A_CLK_SEL_SHIFT,
@@ -82,6 +87,20 @@ static struct meson_pwm_channel_data {
 		.clk_div_shift	= MISC_B_CLK_DIV_SHIFT,
 		.clk_en_shift	= MISC_B_CLK_EN_SHIFT,
 		.pwm_en_mask	= MISC_B_EN,
+	},
+	{	
+		.reg_offset	= REG_PWM_A2,
+		.clk_sel_shift	= MISC_A_CLK_SEL_SHIFT,	// not used?(external clk)
+		.clk_div_shift	= MISC_A_CLK_DIV_SHIFT, // not used?(external clk)
+		.clk_en_shift	= MISC_A_CLK_EN_SHIFT,  // not used? (external clk)
+		.pwm_en_mask	= MISC_A2_EN,
+	},
+	{	
+		.reg_offset	= REG_PWM_B2,
+		.clk_sel_shift	= MISC_B_CLK_SEL_SHIFT, // not used?(external clk)
+		.clk_div_shift	= MISC_B_CLK_DIV_SHIFT, // not used?(external clk)
+		.clk_en_shift	= MISC_B_CLK_EN_SHIFT,  // not used?(external clk)
+		.pwm_en_mask	= MISC_B2_EN,
 	}
 };
 
@@ -100,12 +119,13 @@ struct meson_pwm_data {
 	const char * const *parent_names;
 	unsigned int num_parents;
 	unsigned int extern_clk;
+	unsigned int pwm_count;
 };
 
 struct meson_pwm {
 	struct pwm_chip chip;
 	const struct meson_pwm_data *data;
-	struct meson_pwm_channel channels[MESON_NUM_PWMS];
+	struct meson_pwm_channel *channels;
 	void __iomem *base;
 	/*
 	 * Protects register (write) access to the REG_MISC_AB register
@@ -345,6 +365,7 @@ static const char * const pwm_meson8b_parent_names[] = {
 static const struct meson_pwm_data pwm_meson8b_data = {
 	.parent_names = pwm_meson8b_parent_names,
 	.num_parents = ARRAY_SIZE(pwm_meson8b_parent_names),
+	.pwm_count = 2,
 };
 
 /*
@@ -358,6 +379,7 @@ static const char * const pwm_gxbb_ao_parent_names[] = {
 static const struct meson_pwm_data pwm_gxbb_ao_data = {
 	.parent_names = pwm_gxbb_ao_parent_names,
 	.num_parents = ARRAY_SIZE(pwm_gxbb_ao_parent_names),
+	.pwm_count = 2,
 };
 
 static const char * const pwm_axg_ee_parent_names[] = {
@@ -367,6 +389,7 @@ static const char * const pwm_axg_ee_parent_names[] = {
 static const struct meson_pwm_data pwm_axg_ee_data = {
 	.parent_names = pwm_axg_ee_parent_names,
 	.num_parents = ARRAY_SIZE(pwm_axg_ee_parent_names),
+	.pwm_count = 2,
 };
 
 static const char * const pwm_axg_ao_parent_names[] = {
@@ -376,6 +399,7 @@ static const char * const pwm_axg_ao_parent_names[] = {
 static const struct meson_pwm_data pwm_axg_ao_data = {
 	.parent_names = pwm_axg_ao_parent_names,
 	.num_parents = ARRAY_SIZE(pwm_axg_ao_parent_names),
+	.pwm_count = 2,
 };
 
 static const char * const pwm_g12a_ao_ab_parent_names[] = {
@@ -385,6 +409,7 @@ static const char * const pwm_g12a_ao_ab_parent_names[] = {
 static const struct meson_pwm_data pwm_g12a_ao_ab_data = {
 	.parent_names = pwm_g12a_ao_ab_parent_names,
 	.num_parents = ARRAY_SIZE(pwm_g12a_ao_ab_parent_names),
+	.pwm_count = 2,
 };
 
 static const char * const pwm_g12a_ao_cd_parent_names[] = {
@@ -394,10 +419,17 @@ static const char * const pwm_g12a_ao_cd_parent_names[] = {
 static const struct meson_pwm_data pwm_g12a_ao_cd_data = {
 	.parent_names = pwm_g12a_ao_cd_parent_names,
 	.num_parents = ARRAY_SIZE(pwm_g12a_ao_cd_parent_names),
+	.pwm_count = 2,
 };
 
 static const struct meson_pwm_data pwm_s4_data = {
 	.extern_clk = true,
+	.pwm_count = 2,
+};
+
+static const struct meson_pwm_data pwm_sc2_data = {
+	.extern_clk = true,
+	.pwm_count = 4,
 };
 
 static const struct of_device_id meson_pwm_matches[] = {
@@ -437,6 +469,10 @@ static const struct of_device_id meson_pwm_matches[] = {
 		.compatible = "amlogic,s4-pwm",
 		.data = &pwm_s4_data,
 	},
+	{
+		.compatible = "amlogic,sc2-pwm",
+		.data = &pwm_sc2_data,
+	},
 	{},
 };
 MODULE_DEVICE_TABLE(of, meson_pwm_matches);
@@ -459,8 +495,8 @@ static int meson_pwm_init_channels(struct meson_pwm *meson)
 		struct clk_parent_data div_parent = {}, gate_parent = {};
 		struct clk_init_data init = {};
 
-		if (meson->data->extern_clk) {
-			snprintf(name, sizeof(name), "clkin%u", i);
+		if (meson->data->extern_clk) {	// using external clocks, not the 'created by this driver' ones
+			snprintf(name, sizeof(name), "clkin%u", i % 2); // <-- ugly hack. Maybe I should use the field 'double_channel'  and test for that here
 			channel->clk = devm_clk_get(dev, name);
 			if (IS_ERR(channel->clk)) {
 				dev_err(meson->chip.dev, "can't get device clock\n");
@@ -562,11 +598,16 @@ static int meson_pwm_probe(struct platform_device *pdev)
 		return PTR_ERR(meson->base);
 
 	spin_lock_init(&meson->lock);
+	
+	meson->data = of_device_get_match_data(&pdev->dev);
 	meson->chip.dev = &pdev->dev;
 	meson->chip.ops = &meson_pwm_ops;
-	meson->chip.npwm = MESON_NUM_PWMS;
+	meson->chip.npwm = meson->data->pwm_count;
 
-	meson->data = of_device_get_match_data(&pdev->dev);
+	meson->channels = devm_kcalloc(&pdev->dev, meson->chip.npwm,
+					sizeof(*meson->channels), GFP_KERNEL);
+	if (!meson->channels)
+		return -ENOMEM;
 
 	err = meson_pwm_init_channels(meson);
 	if (err < 0)

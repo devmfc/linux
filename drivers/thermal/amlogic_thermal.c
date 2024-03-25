@@ -162,7 +162,7 @@ static int amlogic_thermal_enable(struct amlogic_thermal *data)
 		return ret;
 
 	regmap_update_bits(data->regmap, TSENSOR_CFG_REG1,
-			   TSENSOR_CFG_REG1_ENABLE, TSENSOR_CFG_REG1_ENABLE);
+			   TSENSOR_CFG_REG1_ENABLE | TSENSOR_CFG_REG1_RSET_VBG | TSENSOR_CFG_REG1_RSET_ADC, TSENSOR_CFG_REG1_ENABLE);
 
 	return 0;
 }
@@ -220,6 +220,19 @@ static const struct amlogic_thermal_data amlogic_thermal_g12a_ddr_param = {
 	.regmap_config = &amlogic_thermal_regmap_config_g12a,
 };
 
+static const struct amlogic_thermal_data amlogic_thermal_sc2_cpu_param = {
+	.u_efuse_off = 0x108,
+	.calibration_parameters = &amlogic_thermal_g12a,
+	.regmap_config = &amlogic_thermal_regmap_config_g12a,
+};
+
+static const struct amlogic_thermal_data amlogic_thermal_sc2_ddr_param = {
+	.u_efuse_off = 0x150,
+	.calibration_parameters = &amlogic_thermal_g12a,
+	.regmap_config = &amlogic_thermal_regmap_config_g12a,
+};
+
+
 static const struct of_device_id of_amlogic_thermal_match[] = {
 	{
 		.compatible = "amlogic,g12a-ddr-thermal",
@@ -228,6 +241,14 @@ static const struct of_device_id of_amlogic_thermal_match[] = {
 	{
 		.compatible = "amlogic,g12a-cpu-thermal",
 		.data = &amlogic_thermal_g12a_cpu_param,
+	},
+	{
+		.compatible = "amlogic,sc2-cpu-thermal",
+		.data = &amlogic_thermal_sc2_cpu_param,
+	},
+	{
+		.compatible = "amlogic,sc2-ddr-thermal",
+		.data = &amlogic_thermal_sc2_ddr_param,
 	},
 	{ /* sentinel */ }
 };

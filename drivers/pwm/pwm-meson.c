@@ -44,6 +44,8 @@
 
 #define REG_PWM_A		0x0
 #define REG_PWM_B		0x4
+#define REG_PWM_A2		0x14
+#define REG_PWM_B2		0x18
 #define PWM_LOW_MASK		GENMASK(15, 0)
 #define PWM_HIGH_MASK		GENMASK(31, 16)
 
@@ -58,8 +60,10 @@
 #define MISC_CLK_SEL_MASK	0x3
 #define MISC_B_EN		BIT(1)
 #define MISC_A_EN		BIT(0)
+#define MISC_A2_EN		BIT(25)
+#define MISC_B2_EN		BIT(24)
 
-#define MESON_NUM_PWMS		2
+#define MESON_NUM_PWMS_MAX		4
 #define MESON_NUM_MUX_PARENTS	4
 
 static struct meson_pwm_channel_data {
@@ -68,7 +72,7 @@ static struct meson_pwm_channel_data {
 	u8		clk_div_shift;
 	u8		clk_en_shift;
 	u32		pwm_en_mask;
-} meson_pwm_per_channel_data[MESON_NUM_PWMS] = {
+} meson_pwm_per_channel_data[MESON_NUM_PWMS_MAX] = {
 	{
 		.reg_offset	= REG_PWM_A,
 		.clk_sel_shift	= MISC_A_CLK_SEL_SHIFT,
@@ -82,7 +86,22 @@ static struct meson_pwm_channel_data {
 		.clk_div_shift	= MISC_B_CLK_DIV_SHIFT,
 		.clk_en_shift	= MISC_B_CLK_EN_SHIFT,
 		.pwm_en_mask	= MISC_B_EN,
+	},
+	{
+		.reg_offset     = REG_PWM_A2,
+		.clk_sel_shift  = MISC_A_CLK_SEL_SHIFT, // not used?(external clk)
+		.clk_div_shift  = MISC_A_CLK_DIV_SHIFT, // not used?(external clk)
+		.clk_en_shift   = MISC_A_CLK_EN_SHIFT,  // not used? (external clk)
+		.pwm_en_mask    = MISC_A2_EN,
+	},
+	{
+		.reg_offset     = REG_PWM_B2,
+		.clk_sel_shift  = MISC_B_CLK_SEL_SHIFT, // not used?(external clk)
+		.clk_div_shift  = MISC_B_CLK_DIV_SHIFT, // not used?(external clk)
+		.clk_en_shift   = MISC_B_CLK_EN_SHIFT,  // not used?(external clk)
+		.pwm_en_mask    = MISC_B2_EN,
 	}
+	
 };
 
 struct meson_pwm_channel {
@@ -99,11 +118,12 @@ struct meson_pwm_channel {
 struct meson_pwm_data {
 	const char *const parent_names[MESON_NUM_MUX_PARENTS];
 	unsigned int extern_clk;
+	unsigned int pwm_count;
 };
 
 struct meson_pwm {
 	const struct meson_pwm_data *data;
-	struct meson_pwm_channel channels[MESON_NUM_PWMS];
+	struct meson_pwm_channel *channels;
 	void __iomem *base;
 	/*
 	 * Protects register (write) access to the REG_MISC_AB register
@@ -341,6 +361,7 @@ static const struct pwm_ops meson_pwm_ops = {
 
 static const struct meson_pwm_data pwm_meson8b_data = {
 	.parent_names = { "xtal", NULL, "fclk_div4", "fclk_div3" },
+	.pwm_count = 2,
 };
 
 /*
@@ -349,26 +370,37 @@ static const struct meson_pwm_data pwm_meson8b_data = {
  */
 static const struct meson_pwm_data pwm_gxbb_ao_data = {
 	.parent_names = { "xtal", "clk81", NULL, NULL },
+	.pwm_count = 2,
 };
 
 static const struct meson_pwm_data pwm_axg_ee_data = {
 	.parent_names = { "xtal", "fclk_div5", "fclk_div4", "fclk_div3" },
+	.pwm_count = 2,
 };
 
 static const struct meson_pwm_data pwm_axg_ao_data = {
 	.parent_names = { "xtal", "axg_ao_clk81", "fclk_div4", "fclk_div5" },
+	.pwm_count = 2,
 };
 
 static const struct meson_pwm_data pwm_g12a_ao_ab_data = {
 	.parent_names = { "xtal", "g12a_ao_clk81", "fclk_div4", "fclk_div5" },
+	.pwm_count = 2,
 };
 
 static const struct meson_pwm_data pwm_g12a_ao_cd_data = {
 	.parent_names = { "xtal", "g12a_ao_clk81", NULL, NULL },
+	.pwm_count = 2,
 };
 
 static const struct meson_pwm_data pwm_s4_data = {
 	.extern_clk = true,
+	.pwm_count = 2,
+};
+
+static const struct meson_pwm_data pwm_sc2_data = {
+	.extern_clk = true,
+	.pwm_count = 4,
 };
 
 static const struct of_device_id meson_pwm_matches[] = {
@@ -407,6 +439,10 @@ static const struct of_device_id meson_pwm_matches[] = {
 	{
 		.compatible = "amlogic,s4-pwm",
 		.data = &pwm_s4_data,
+	},
+	{
+		.compatible = "amlogic,sc2-pwm",
+		.data = &pwm_sc2_data,
 	},
 	{},
 };
@@ -517,10 +553,13 @@ static int meson_pwm_init_channels(struct pwm_chip *chip)
 static int meson_pwm_probe(struct platform_device *pdev)
 {
 	struct pwm_chip *chip;
+	struct meson_pwm_data *data;
 	struct meson_pwm *meson;
 	int err;
 
-	chip = devm_pwmchip_alloc(&pdev->dev, MESON_NUM_PWMS, sizeof(*meson));
+	data = of_device_get_match_data(&pdev->dev);
+
+	chip = devm_pwmchip_alloc(&pdev->dev, data->pwm_count, sizeof(*meson));
 	if (IS_ERR(chip))
 		return PTR_ERR(chip);
 	meson = to_meson_pwm(chip);
@@ -529,10 +568,15 @@ static int meson_pwm_probe(struct platform_device *pdev)
 	if (IS_ERR(meson->base))
 		return PTR_ERR(meson->base);
 
+	meson->channels = devm_kcalloc(&pdev->dev, data->pwm_count,
+									sizeof(*meson->channels), GFP_KERNEL);
+	if (!meson->channels)
+		return -ENOMEM;
+
 	spin_lock_init(&meson->lock);
 	chip->ops = &meson_pwm_ops;
 
-	meson->data = of_device_get_match_data(&pdev->dev);
+	meson->data = data;
 
 	err = meson_pwm_init_channels(chip);
 	if (err < 0)
